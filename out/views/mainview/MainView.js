@@ -112,7 +112,10 @@ var MainView = /** @class */ (function (_super) {
     };
     MainView.prototype.renderList = function () {
         var _this = this;
-        return React.createElement(react_native_1.FlatList, { data: this.state.names, extraData: this.state, renderItem: function (_a) {
+        return React.createElement(react_native_1.FlatList, {
+            data: this.state.names, extraData: this.state, onRefresh: function () {
+                return _this.getNames();
+            }, refreshing: this.state.isLoading, renderItem: function (_a) {
                 var item = _a.item;
                 return React.createElement(react_native_elements_1.ListItem, { title: item + "", onPress: function () {
                         _this.actionSheet.show();
@@ -165,11 +168,10 @@ var MainView = /** @class */ (function (_super) {
                     case 1:
                         if (!(_i < images_1.length)) return [3 /*break*/, 4];
                         image = images_1[_i];
-                        if (this.pressedName != "") {
-                        }
+                        if (!(this.pressedName != "")) return [3 /*break*/, 3];
                         return [4 /*yield*/, rn_fetch_blob_1.default.fetch('POST', constants_1.default.UPLOAD_IMAGE + this.pressedName, { 'Content-Type': 'multipart/form-data' }, [{
                                     name: 'file',
-                                    filename: "ramzi.png",
+                            filename: new Date().getTime() + "." + (image.mime.split("/")[1]),
                                     data: rn_fetch_blob_1.default.wrap(image.path)
                                 }])];
                     case 2:

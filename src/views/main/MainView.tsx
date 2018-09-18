@@ -1,28 +1,34 @@
 import * as React from "react";
 import {FlatList, ProgressBarAndroid, Text, ToastAndroid, View} from "react-native";
-import styles from "./styles";
+import style from "./style";
 import ImagePicker, {Image} from 'react-native-image-crop-picker';
 import {ListItem} from "react-native-elements";
 //ts-ignore
-import { ActionSheetCustom as ActionSheet } from 'react-native-actionsheet'
+import {ActionSheetCustom as ActionSheet} from 'react-native-actionsheet'
 import url from "../../constants";
-import RNFetchBlob from 'rn-fetch-blob'
+import UploadModal from "../upload/UploadModal";
 
 
 type State={
     names:any,
-    isLoading:boolean
+    isLoading: boolean,
+    images: Image[],
+    uploadModalOpened: boolean,
+    pressedName: string;
 }
 export default class MainView extends React.Component<any,State>{
 
 
     actionSheet: any;
-    pressedName:string;
-
     constructor(props: Readonly<any>) {
         super(props);
-        this.state={names:[],isLoading:false}
-        this.pressedName="";
+        this.state = {
+            names: [],
+            isLoading: false,
+            uploadModalOpened: false,
+            images: [],
+            pressedName: ""
+        }
     }
 
     componentWillMount(){
@@ -30,7 +36,7 @@ export default class MainView extends React.Component<any,State>{
     }
 
     render(){
-        return <View style={styles.container}>
+        return <View style={style.container}>
             {this.state.isLoading?<ProgressBarAndroid indeterminate={true}/>:this.renderList()}
             <ActionSheet
                 ref={(o:any) => this.actionSheet = o}
@@ -41,6 +47,8 @@ export default class MainView extends React.Component<any,State>{
                     this.chooseImages(index);
                 }}
             />
+            <UploadModal name={this.state.pressedName} images={this.state.images}
+                         modalOpened={this.state.uploadModalOpened}/>
         </View>;
     }
 
@@ -60,11 +68,13 @@ export default class MainView extends React.Component<any,State>{
         return <FlatList
             data={this.state.names}
             extraData={this.state}
+            onRefresh={() => this.getNames()}
+            refreshing={this.state.isLoading}
             renderItem={({item}) =>
                 <ListItem title={item+""}
                           onPress={()=>{
                               this.actionSheet.show()
-                              this.pressedName=item+"";
+                              this.setState({pressedName: item + ""})
                           }}
                           bottomDivider={true}
                           chevron={true}
@@ -96,28 +106,11 @@ export default class MainView extends React.Component<any,State>{
     }
 
     private async uploadImages(images:Image|Image[]){
-        let rnfetch;
         if(Array.isArray(images)) {
-            for (const image of images) {
-                if (this.pressedName != ""){
-
-                }
-                    rnfetch = await RNFetchBlob.fetch('POST', url.UPLOAD_IMAGE + this.pressedName,
-                        {'Content-Type': 'multipart/form-data'}, [{
-                            name: 'file',
-                            filename: "ramzi.png",
-                            data: RNFetchBlob.wrap(image.path)
-                        }])
-            }
+            this.setState({images: images, uploadModalOpened: true});
         }
         else{
-            await RNFetchBlob.fetch('POST', url.UPLOAD_IMAGE + this.pressedName,
-                {'Content-Type': 'multipart/form-data'},
-                [{
-                    name: 'file',
-                    filename: 'image.' + images.mime,
-                    data: RNFetchBlob.wrap(images.path)
-                }])
+            this.setState({images: [images], uploadModalOpened: true});
         }
 
     }
