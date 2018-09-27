@@ -113,7 +113,7 @@ var MainView = /** @class */ (function (_super) {
     MainView.prototype.renderList = function () {
         var _this = this;
         return React.createElement(react_native_1.FlatList, {
-            data: this.state.names, extraData: this.state, onRefresh: function () {
+            data: this.state.people, extraData: this.state, onRefresh: function () {
                 return _this.getNames();
             }, refreshing: this.state.isLoading, renderItem: function (_a) {
                 var item = _a.item;

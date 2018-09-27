@@ -1,15 +1,20 @@
-import {Image} from "react-native-image-crop-picker";
 import * as React from "react";
-import {FlatList, Image as ReactImage, Modal, ProgressBarAndroid} from "react-native";
-import {ListItem} from "react-native-elements";
-import styles from "./style";
-import url from "../../constants";
+import {Alert, FlatList, Image as ReactImage, Modal, ProgressBarAndroid, Text, TouchableOpacity,} from "react-native";
+import {Badge, Header, ListItem} from "react-native-elements";
+import {Image} from "react-native-image-crop-picker";
+//ts-ignore
+import EvilIcons from 'react-native-vector-icons/dist/EvilIcons'
 import RNFetchBlob from 'rn-fetch-blob'
+import url, {BLACKLIST_URL, dbTypes, WHITELIST_URL} from "../../constants";
+import styles from "./style";
+
 
 type Props = {
     images: Image[],
     modalOpened: boolean,
-    name: string
+    name: string,
+    closeModal: () => void,
+    dbType: string,
 }
 
 type State = {
@@ -17,49 +22,82 @@ type State = {
 }
 
 export default class UploadModal extends React.Component<Props, State> {
+    private baseUrl: string;
 
     constructor(props: Readonly<Props>) {
         super(props);
+        this.baseUrl = this.props.dbType === dbTypes.whitelist ? WHITELIST_URL : BLACKLIST_URL;
         this.state = {
             uploadProgress: []
         }
 
     }
 
-    async componentWillMount() {
+    render() {
+        const {uploadProgress} = this.state;
+        return <Modal visible={this.props.modalOpened} animationType={"fade"} onRequestClose={() => null}
+                      onShow={() => {
+                          this.setState({uploadProgress: uploadProgress.fill(0, 0, this.props.images.length - 1)});
+                          this.uploadImages()
+                      }}>
+            <Header
+                backgroundColor={"#fff"}
+                centerComponent={<Text style={styles.titleStyle}>{this.props.name}</Text>}
+                leftComponent={
+                    <TouchableOpacity onPress={() => this.props.closeModal()}>
+                        <EvilIcons name={"close"} size={34} color={"#000"}/>
+                    </TouchableOpacity>
+                }
+            />
+
+            <FlatList data={this.props.images}
+                      renderItem={({item, index}) => this.renderRow(item, index)}
+                      extraData={this.state}
+                      keyExtractor={(item, index) => index + ""}
+            />
+        </Modal>
+    }
+
+    private async uploadImages() {
         const {images, name} = this.props;
         let index = 0;
         for (const image of images) {
             if (name != "") {
-                await RNFetchBlob.fetch('POST', url.UPLOAD_IMAGE + name,
-                    {'Content-Type': 'multipart/form-data'}, [{
-                        name: 'file',
-                        filename: new Date().getTime() + "." + (image.mime.split("/")[1]),
-                        data: RNFetchBlob.wrap(image.path)
-                    }]).uploadProgress({interval: 1}, (written: number, total: number) => {
-                    this.state.uploadProgress[index] = written / total;
-                    this.setState({uploadProgress: this.state.uploadProgress});
-                })
+                try {
+                    await RNFetchBlob.fetch('POST', (this.baseUrl + encodeURIComponent(name) + "/" + url.images),
+                        {'Content-Type': 'multipart/form-data'}, [{
+                            name: 'file',
+                            filename: new Date().getTime() + "." + (image.mime.split("/")[1]),
+                            data: RNFetchBlob.wrap(image.path)
+                        }]).uploadProgress({interval: 0.1}, (written: number, total: number) => {
+                        this.state.uploadProgress[index] = written / total;
+                        this.setState({uploadProgress: this.state.uploadProgress});
+                    })
+                }
+                catch (e) {
+                    Alert.alert("Upload Failed", e.toString());
+                    break;
+                }
             }
             index++;
         }
     }
 
-    render() {
+    private renderRow(item: any, index: number): any {
         const {uploadProgress} = this.state;
-        return <Modal visible={this.props.modalOpened} animationType={"fade"} onRequestClose={() => null}>
-            <FlatList data={this.props.images}
-                      renderItem={({item, index}) => <ListItem rightElement={
-                          <ReactImage style={styles.image}
-                                      source={{uri: item.path}}/>}
-                                                               bottomDivider={true}
-                                                               leftElement={<ProgressBarAndroid
-                                                                   progress={uploadProgress[index]}/>}
-                      />}
-
-                      extraData={this.state}
-                      keyExtractor={(item, index) => index + ""}
-            />
-        </Modal>
+        return <ListItem leftElement={
+            <ReactImage style={{width: (item.width * 0.07), height: item.height * 0.04}}
+                        source={{uri: item.path}}/>}
+                         bottomDivider={true}
+                         rightElement={
+                             uploadProgress[index] < 0.98 ?
+                                 <ProgressBarAndroid
+                                     styleAttr={"Horizontal"}
+                                     style={styles.progress}
+                                     progress={uploadProgress[index]}
+                                     indeterminate={false}/> :
+                                 <Badge value={uploadProgress[index]}/>
+                         }
+        />
     }
 }
