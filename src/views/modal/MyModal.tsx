@@ -12,7 +12,8 @@ type Props = {
     textValue?: string,
     title: string,
     onButtonPress: (textValue: string) => void,
-    label: string
+    label: string,
+    onShow?: () => void
 }
 type States = {
     textValue: string
@@ -28,23 +29,13 @@ export default class MyModal extends React.Component<Props, States> {
         }
     }
 
-    // async getSnapshotBeforeUpdate(prevProps: Readonly<Props>, prevState: Readonly<States>): any | null {
-    //     let url = await AsyncStorage.getItem(KEY);
-    //     return url;
-    // }
-    //
-    // componentDidUpdate(prevProps: Readonly<Props>, prevState: Readonly<States>, snapshot?: any): void {
-    //     console.log(snapshot)
-    //     if (snapshot)
-    //         this.setState({textValue: snapshot})
-    // }
-
 
     render() {
         return <Modal supportedOrientations={["portrait", "landscape"]}
                       isVisible={this.props.modalOpen}
                       onBackButtonPress={() => this.props.closeModal()}
                       style={styles.modal}
+                      onModalShow={() => this.props.onShow()}
                       avoidKeyboard={true}>
             <View style={styles.viewContainer}>
                 <Text style={styles.title}>{this.props.title}</Text>

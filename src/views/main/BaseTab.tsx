@@ -6,7 +6,7 @@ import {Badge, Button, Header, ListItem} from "react-native-elements";
 import ImagePicker, {Image} from 'react-native-image-crop-picker';
 import Entypo from 'react-native-vector-icons/dist/Entypo'
 import MaterialIcons from 'react-native-vector-icons/dist/MaterialIcons';
-import url, {BLACKLIST_URL, dbTypes, KEY, WHITELIST_URL} from "../../constants";
+import url, {BLACKLIST_URL, KEY, WHITELIST_URL} from "../../constants";
 import MyModal from "../modal/MyModal";
 import styles from "../modal/style";
 import UploadModal from "../upload/UploadModal";
@@ -20,8 +20,10 @@ type State = {
     pressedName: string,
     addUserModalOpened: boolean,
     networkError: boolean,
-    urlModalOpened: boolean
+    urlModalOpened: boolean,
+    urlValue: string
 }
+
 type Props = {
     dbType: string
 }
@@ -29,14 +31,11 @@ type Props = {
 export default class BaseTab extends React.Component<Props, State> {
 
 
-    private actionSheet: any;
-    private baseUrl: string;
-    private menus = []
+    private cameraSheet: any;
+    private menuSheet: any;
 
     constructor(props: Readonly<Props>) {
         super(props);
-        const {dbType} = this.props;
-        this.baseUrl = dbType === dbTypes.whitelist ? WHITELIST_URL : BLACKLIST_URL;
         this.state = {
             people: [],
             isLoading: false,
@@ -45,7 +44,8 @@ export default class BaseTab extends React.Component<Props, State> {
             pressedName: "",
             addUserModalOpened: false,
             urlModalOpened: false,
-            networkError: false
+            networkError: false,
+            urlValue: ""
         }
     }
 
@@ -64,15 +64,6 @@ export default class BaseTab extends React.Component<Props, State> {
                         </TouchableOpacity>
                     }/>
             {this.renderView()}
-            <ActionSheet
-                ref={(o: any) => this.actionSheet = o}
-                title={<Text style={{color: '#ff1947', fontSize: 18}}>Choose Image From</Text>}
-                options={['From Gallery', 'From Camera', 'Cancel']}
-                cancelButtonIndex={2}
-                onPress={(index: number) => {
-                    this.chooseImages(index);
-                }}
-            />
 
             <UploadModal name={this.state.pressedName} images={this.state.images}
                          modalOpened={this.state.uploadModalOpened}
@@ -97,30 +88,63 @@ export default class BaseTab extends React.Component<Props, State> {
             <MyModal modalOpen={this.state.urlModalOpened}
                      closeModal={() => this.setState({urlModalOpened: false})}
                      title={"Server Url"}
+                     onShow={async () => {
+                         let url = await AsyncStorage.getItem(KEY);
+                         if (url)
+                             this.setState({urlValue: url});
+                     }}
                      onButtonPress={async textValue => {
                          await AsyncStorage.setItem(KEY, textValue);
                          ToastAndroid.show("url saved", ToastAndroid.LONG);
                      }}
-                     textValue={""}
+                     textValue={this.state.urlValue}
                      label={"server url"}/>
             {this.state.isLoading || this.state.networkError ? null :
                 <Button onPress={() => this.setState({addUserModalOpened: true})}
                         title={""} buttonStyle={style.addButton}
                         icon={<MaterialIcons name={"add"} size={44} color={"white"}/>}/>}
+
+            <ActionSheet
+                ref={(o: any) => this.cameraSheet = o}
+                title={<Text style={{color: '#ff1947', fontSize: 18}}>Choose Image From</Text>}
+                options={['From Gallery', 'From Camera', 'Cancel']}
+                cancelButtonIndex={2}
+                onPress={(index: number) => {
+                    this.chooseImages(index);
+                }}
+            />
+
+            <ActionSheet
+                ref={(o: any) => this.menuSheet = o}
+                title={<Text style={{color: '#ff1947', fontSize: 18}}>Menu</Text>}
+                options={['Upload Image', 'Train Modal', 'Cancel']}
+                cancelButtonIndex={2}
+                onPress={(index: number) => {
+
+                    if (index == 0) {
+                        this.cameraSheet.show();
+                        this.menuSheet.hide()
+                    }
+                    else if (index == 1) {
+                        this.menuSheet.hide();
+                        this.trainPerson();
+                    }
+                }}
+            />
         </View>);
     }
 
-    private async getUrl() {
-        // return await
-    }
-
     private renderView() {
+        console.log(this.state.people)
         if (this.state.isLoading)
             return <ProgressBarAndroid indeterminate={true}/>
+
         else if (this.state.networkError)
             return <Text style={style.error}>{"Network Error"}</Text>
+
         else if (this.state.people == null || this.state.people.length == 0)
             return <Text style={style.error}>{"No Data"}</Text>
+
         else if (!this.state.isLoading)
             return this.renderList()
 
@@ -129,12 +153,16 @@ export default class BaseTab extends React.Component<Props, State> {
     private async getNames() {
         try {
             this.setState({isLoading: true, networkError: false});
+            let baseUrl = await AsyncStorage.getItem(KEY);
+            if (baseUrl && !baseUrl.endsWith("/"))
+                baseUrl = baseUrl + "/"
+            const furl = baseUrl + this.props.dbType + "/" + url.names;
             let noRes = true;
             let timerId = setTimeout(() => {
                 if (noRes)
-                    this.setState({networkError: true, isLoading: false});
+                    this.setState({networkError: false, isLoading: false});
             }, 10000);
-            let res = await fetch(this.baseUrl + url.names);
+            let res = await fetch(furl);
 
             if (!res.ok) {
                 ToastAndroid.show("No Internet Connection", ToastAndroid.LONG);
@@ -144,7 +172,7 @@ export default class BaseTab extends React.Component<Props, State> {
                 noRes = false;
                 clearTimeout(timerId);
             }
-            let json = await res.json()
+            let json = await res.json();
             this.setState({people: json, isLoading: false, networkError: false});
         }
         catch (e) {
@@ -154,7 +182,6 @@ export default class BaseTab extends React.Component<Props, State> {
 
 
     private renderList() {
-        this.menus = []
         // @ts-ignore
         return <FlatList
             style={style.list}
@@ -167,7 +194,7 @@ export default class BaseTab extends React.Component<Props, State> {
                     title={item.name}
                     rightElement={<Badge value={item.imageCount + ""} containerStyle={style.countBadge}/>}
                     onPress={() => {
-                        this.actionSheet.show()
+                        this.menuSheet.show()
                         this.setState({pressedName: item.name + ""})
                     }
                     }
@@ -217,7 +244,11 @@ export default class BaseTab extends React.Component<Props, State> {
     private async addUser(textValue: string) {
         console.log(textValue)
         try {
-            let res = await fetch(this.baseUrl + url.addName, {
+            let baseUrl = await AsyncStorage.getItem(KEY);
+            if (baseUrl && !baseUrl.endsWith("/"))
+                baseUrl = baseUrl + "/"
+            const furl = baseUrl + this.props.dbType + "/" + url.addName;
+            let res = await fetch(furl, {
                 method: 'POST',
                 body: JSON.stringify({
                     name: textValue
@@ -231,6 +262,10 @@ export default class BaseTab extends React.Component<Props, State> {
         catch (e) {
             ToastAndroid.show(e.toString(), ToastAndroid.LONG);
         }
+    }
+
+    private async trainPerson() {
+
     }
 }
 

@@ -1,11 +1,20 @@
 import * as React from "react";
-import {Alert, FlatList, Image as ReactImage, Modal, ProgressBarAndroid, Text, TouchableOpacity,} from "react-native";
+import {
+    Alert,
+    AsyncStorage,
+    FlatList,
+    Image as ReactImage,
+    Modal,
+    ProgressBarAndroid,
+    Text,
+    TouchableOpacity,
+} from "react-native";
 import {Badge, Header, ListItem} from "react-native-elements";
 import {Image} from "react-native-image-crop-picker";
 //ts-ignore
 import EvilIcons from 'react-native-vector-icons/dist/EvilIcons'
 import RNFetchBlob from 'rn-fetch-blob'
-import url, {BLACKLIST_URL, dbTypes, WHITELIST_URL} from "../../constants";
+import url, {KEY} from "../../constants";
 import styles from "./style";
 
 
@@ -22,11 +31,8 @@ type State = {
 }
 
 export default class UploadModal extends React.Component<Props, State> {
-    private baseUrl: string;
-
     constructor(props: Readonly<Props>) {
         super(props);
-        this.baseUrl = this.props.dbType === dbTypes.whitelist ? WHITELIST_URL : BLACKLIST_URL;
         this.state = {
             uploadProgress: []
         }
@@ -60,12 +66,16 @@ export default class UploadModal extends React.Component<Props, State> {
     }
 
     private async uploadImages() {
-        const {images, name} = this.props;
+        const {images, name, dbType} = this.props;
+        let baseUrl = await AsyncStorage.getItem(KEY);
+        if (baseUrl && !baseUrl.endsWith("/"))
+            baseUrl = baseUrl + "/"
+        const furl = baseUrl + dbType + "/" + encodeURIComponent(name) + "/" + url.images;
         let index = 0;
         for (const image of images) {
             if (name != "") {
                 try {
-                    await RNFetchBlob.fetch('POST', (this.baseUrl + encodeURIComponent(name) + "/" + url.images),
+                    await RNFetchBlob.fetch('POST', (furl),
                         {'Content-Type': 'multipart/form-data'}, [{
                             name: 'file',
                             filename: new Date().getTime() + "." + (image.mime.split("/")[1]),
