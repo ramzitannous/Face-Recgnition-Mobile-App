@@ -13,6 +13,7 @@
     "react-native-actionsheet": "^2.4.2",
     "react-native-elements": "^1.0.0-beta5",
     "react-native-image-crop-picker": "^0.21.1",
+    "react-native-material-menu": "^0.4.0",
     "react-native-modal": "^6.5.0",
     "react-native-vector-icons": "^5.0.0",
     "react-navigation": "^2.14.2",

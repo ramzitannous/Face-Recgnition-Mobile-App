@@ -2,9 +2,10 @@ import * as React from "react";
 import {createBottomTabNavigator} from "react-navigation";
 import BaseTab from "./views/main/BaseTab";
 
-const BASE_URL = "http://192.168.1.147:5000/"
-export const WHITELIST_URL = BASE_URL + "whitelist/";
-export const BLACKLIST_URL = BASE_URL + "blacklist/"
+const DEFAULT_BASE_URL = "http://192.168.0.19:5000/";
+export const KEY = "server-url";
+export const WHITELIST_URL = DEFAULT_BASE_URL + "whitelist/";
+export const BLACKLIST_URL = DEFAULT_BASE_URL + "blacklist/"
 export const dbTypes = {
     whitelist: "whitelist",
     blacklist: "blacklist"
@@ -26,7 +27,9 @@ export const TabRouter = createBottomTabNavigator({
     {
         initialRouteName: 'whiteList',
         lazy: true,
-        navigationOptions: ({navigation}) => ({}),
+        navigationOptions: ({navigation}) => ({
+            tabBarLabel: navigation.state.routeName == 'whiteList' ? "White List" : "Black List"
+        }),
         tabBarOptions: {
             activeTintColor: 'tomato',
             inactiveTintColor: 'gray',

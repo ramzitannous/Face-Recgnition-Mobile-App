@@ -1,12 +1,14 @@
 import * as React from "react";
-import {FlatList, ProgressBarAndroid, Text, ToastAndroid, View} from "react-native";
+import {AsyncStorage, FlatList, ProgressBarAndroid, Text, ToastAndroid, TouchableOpacity, View} from "react-native";
 //ts-ignore
 import {ActionSheetCustom as ActionSheet} from 'react-native-actionsheet'
-import {Badge, Button, ListItem} from "react-native-elements";
+import {Badge, Button, Header, ListItem} from "react-native-elements";
 import ImagePicker, {Image} from 'react-native-image-crop-picker';
+import Entypo from 'react-native-vector-icons/dist/Entypo'
 import MaterialIcons from 'react-native-vector-icons/dist/MaterialIcons';
-import url, {BLACKLIST_URL, dbTypes, WHITELIST_URL} from "../../constants";
-import AddUserModal from "../addUser/AddUserModal";
+import url, {BLACKLIST_URL, dbTypes, KEY, WHITELIST_URL} from "../../constants";
+import MyModal from "../modal/MyModal";
+import styles from "../modal/style";
 import UploadModal from "../upload/UploadModal";
 import style from "./style";
 
@@ -17,7 +19,8 @@ type State = {
     uploadModalOpened: boolean,
     pressedName: string,
     addUserModalOpened: boolean,
-    networkError: boolean
+    networkError: boolean,
+    urlModalOpened: boolean
 }
 type Props = {
     dbType: string
@@ -28,6 +31,7 @@ export default class BaseTab extends React.Component<Props, State> {
 
     private actionSheet: any;
     private baseUrl: string;
+    private menus = []
 
     constructor(props: Readonly<Props>) {
         super(props);
@@ -39,7 +43,8 @@ export default class BaseTab extends React.Component<Props, State> {
             uploadModalOpened: false,
             images: [],
             pressedName: "",
-            addUserModalOpened: true,
+            addUserModalOpened: false,
+            urlModalOpened: false,
             networkError: false
         }
     }
@@ -49,7 +54,15 @@ export default class BaseTab extends React.Component<Props, State> {
     }
 
     render() {
-        return <View style={style.container}>
+        return (<View style={style.container}>
+            <Header outerContainerStyles={style.header}
+                    backgroundColor={"#e1e1e1"}
+                    leftComponent={<Text style={styles.title}>{"Names"}</Text>}
+                    rightComponent={
+                        <TouchableOpacity onPress={() => this.setState({urlModalOpened: true})}>
+                            <Entypo name={"dots-three-vertical"} size={22} color={"#fff"}/>
+                        </TouchableOpacity>
+                    }/>
             {this.renderView()}
             <ActionSheet
                 ref={(o: any) => this.actionSheet = o}
@@ -60,6 +73,7 @@ export default class BaseTab extends React.Component<Props, State> {
                     this.chooseImages(index);
                 }}
             />
+
             <UploadModal name={this.state.pressedName} images={this.state.images}
                          modalOpened={this.state.uploadModalOpened}
                          closeModal={
@@ -69,61 +83,89 @@ export default class BaseTab extends React.Component<Props, State> {
                              }}
                          dbType={this.props.dbType}/>
 
-            <AddUserModal modalOpen={this.state.addUserModalOpened}
-                          closeModal={() => {
-                              this.setState({addUserModalOpened: false})
-                              this.getNames()
-                          }} dbType={this.props.dbType}/>
+            <MyModal modalOpen={this.state.addUserModalOpened}
+                     title={"Add User To " + this.props.dbType}
+                     closeModal={() => {
+                         this.setState({addUserModalOpened: false})
+                         this.getNames()
+                     }}
+                     textValue={""}
+                     label={"Username"}
+                     onButtonPress={textValue => this.addUser(textValue)}
+            />
+
+            <MyModal modalOpen={this.state.urlModalOpened}
+                     closeModal={() => this.setState({urlModalOpened: false})}
+                     title={"Server Url"}
+                     onButtonPress={async textValue => {
+                         await AsyncStorage.setItem(KEY, textValue);
+                         ToastAndroid.show("url saved", ToastAndroid.LONG);
+                     }}
+                     textValue={""}
+                     label={"server url"}/>
             {this.state.isLoading || this.state.networkError ? null :
                 <Button onPress={() => this.setState({addUserModalOpened: true})}
                         title={""} buttonStyle={style.addButton}
-                        icon={<MaterialIcons name={"add"} size={26} color={"white"}/>}/>}
-        </View>;
+                        icon={<MaterialIcons name={"add"} size={44} color={"white"}/>}/>}
+        </View>);
+    }
+
+    private async getUrl() {
+        // return await
     }
 
     private renderView() {
         if (this.state.isLoading)
             return <ProgressBarAndroid indeterminate={true}/>
-        else if (this.state == null || this.state.people.length == 0)
+        else if (this.state.networkError)
+            return <Text style={style.error}>{"Network Error"}</Text>
+        else if (this.state.people == null || this.state.people.length == 0)
             return <Text style={style.error}>{"No Data"}</Text>
         else if (!this.state.isLoading)
             return this.renderList()
-        else if (this.state.networkError)
-            return <Text style={style.error}>{"Server Down \n Or \n Network Error"}</Text>
+
     }
 
     private async getNames() {
         try {
             this.setState({isLoading: true, networkError: false});
-            let data = await fetch(this.baseUrl + url.names);
-            if (!data.ok) {
+            let noRes = true;
+            let timerId = setTimeout(() => {
+                if (noRes)
+                    this.setState({networkError: true, isLoading: false});
+            }, 10000);
+            let res = await fetch(this.baseUrl + url.names);
+
+            if (!res.ok) {
                 ToastAndroid.show("No Internet Connection", ToastAndroid.LONG);
                 return;
             }
-            let json = await data.json()
-            console.log(json)
+            else {
+                noRes = false;
+                clearTimeout(timerId);
+            }
+            let json = await res.json()
             this.setState({people: json, isLoading: false, networkError: false});
         }
         catch (e) {
-            this.setState({networkError: true});
+            this.setState({networkError: true, isLoading: false});
         }
     }
 
 
     private renderList() {
+        this.menus = []
         // @ts-ignore
         return <FlatList
+            style={style.list}
             data={this.state.people}
             extraData={this.state}
             onRefresh={() => this.getNames()}
             refreshing={this.state.isLoading}
-            renderItem={({item}: any) => {
-                console.log(item)
+            renderItem={({item, index}: any) => {
                 return < ListItem
                     title={item.name}
-                    rightElement={
-                        <Badge value={item.imageCount + ""} containerStyle={style.countBadge}/>
-                    }
+                    rightElement={<Badge value={item.imageCount + ""} containerStyle={style.countBadge}/>}
                     onPress={() => {
                         this.actionSheet.show()
                         this.setState({pressedName: item.name + ""})
@@ -169,6 +211,25 @@ export default class BaseTab extends React.Component<Props, State> {
         }
         else {
             this.setState({images: [images], uploadModalOpened: true});
+        }
+    }
+
+    private async addUser(textValue: string) {
+        console.log(textValue)
+        try {
+            let res = await fetch(this.baseUrl + url.addName, {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: textValue
+                })
+                ,
+                headers: {}
+            })
+            if (res.ok)
+                ToastAndroid.show("User Added", ToastAndroid.LONG);
+        }
+        catch (e) {
+            ToastAndroid.show(e.toString(), ToastAndroid.LONG);
         }
     }
 }

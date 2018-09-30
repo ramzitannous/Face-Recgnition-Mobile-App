@@ -33,6 +33,7 @@ export default class UploadModal extends React.Component<Props, State> {
 
     }
 
+
     render() {
         const {uploadProgress} = this.state;
         return <Modal visible={this.props.modalOpened} animationType={"fade"} onRequestClose={() => null}
